@@ -14,7 +14,6 @@ import java.util.Date;
 @Builder
 @Entity
 @Table(name = "USUARIOS")
-@Data
 public class UsuarioEntity extends GenericTable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -64,14 +63,24 @@ public class UsuarioEntity extends GenericTable {
     @JsonIgnore
     @JoinColumn(name = "ID_PERFIL")
     @ManyToOne
+    @Basic(optional = false)
     private PerfilEntity perfil;
     @JsonIgnore
     @JoinColumn(name = "ID_ESTATUS")
     @ManyToOne
     private EstatusEntity estatus;
+
+
+    @ManyToOne
+    @JoinColumn(name = "ID_PLANTEL")
+    private PlantelEntity plantel;
+
+    @ManyToOne
+    @JoinColumn(name = "ID_CARRERA")
+    private CarreraEntity carrera;
+
     @JsonIgnore
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "ID_DIRECCION")
-
     private DireccionEntity idDireccion;
 }

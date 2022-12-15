@@ -35,4 +35,7 @@ public class MunicipioEntity extends GenericTable implements Serializable {
     @JsonIgnore
     @OneToMany(mappedBy = "idMunicipio")
     private List<AsentamientoEntity> asentamientos;
+
+    @OneToMany(mappedBy = "idMunicipio")
+    private List<PlantelEntity> planteles;
 }

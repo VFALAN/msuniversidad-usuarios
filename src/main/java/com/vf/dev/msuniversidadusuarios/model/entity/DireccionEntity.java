@@ -34,6 +34,9 @@ public class DireccionEntity extends GenericTable implements Serializable {
     @Column(name = "NUMERO_INTERIOR")
     @JsonIgnore
     private String numeroInterior;
+
+    @Column(name = "COLONIA")
+    private String colonia;
     @JsonIgnore
     @JoinColumn(name = "ID_ASENTAMIENTO")
     @ManyToOne

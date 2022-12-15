@@ -24,5 +24,5 @@ public abstract class GenericTable implements Serializable {
     private Date fechaAlta;
     @JsonProperty
     @Column(name = "IND_ACTIVO")
-    private boolean indActivo;
+    private Boolean indActivo;
 }

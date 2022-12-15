@@ -4,6 +4,7 @@ import com.vf.dev.msuniversidadusuarios.model.dto.PaginationObject;
 import com.vf.dev.msuniversidadusuarios.utils.exception.MsUniversidadException;
 
 import java.util.List;
+import java.util.Map;
 
 public interface IGenericService<R, D, T> {
     R findById(Integer pId) throws MsUniversidadException;
@@ -18,5 +19,7 @@ public interface IGenericService<R, D, T> {
 
     List<R> finaAll();
 
-    PaginationObject<T> paginar(int size, int page, String column, String orden);
+    D getDetail(Integer pId) throws MsUniversidadException;
+
+    PaginationObject<T> paginar(int size, int page, String column, String orden, Map<String , Object> filters);
 }

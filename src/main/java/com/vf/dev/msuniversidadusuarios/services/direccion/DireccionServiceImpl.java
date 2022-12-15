@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -59,7 +60,12 @@ public class DireccionServiceImpl implements IDireccionService {
     }
 
     @Override
-    public PaginationObject<DireccionTableDTO> paginar(int size, int page, String column, String orden) {
+    public DireccionDTO getDetail(Integer pId) throws MsUniversidadException {
+        return null;
+    }
+
+    @Override
+    public PaginationObject<DireccionTableDTO> paginar(int size, int page, String column, String orden, Map<String , Object> filters) {
         return null;
     }
 }
