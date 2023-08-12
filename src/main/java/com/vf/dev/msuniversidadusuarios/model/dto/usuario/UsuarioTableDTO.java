@@ -17,13 +17,13 @@ public class UsuarioTableDTO implements Serializable {
     @JsonProperty
     private String nombre;
     @JsonProperty
-    private String aPaterno;
+    private String paterno;
     @JsonProperty
-    private String aMaterno;
+    private String materno;
     @JsonProperty
-    private String idEstatus;
+    private String estatus;
     @JsonProperty
-    private String idPerfil;
+    private String perfil;
     @JsonProperty
     private String folio;
     @JsonProperty

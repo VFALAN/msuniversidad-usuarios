@@ -21,7 +21,7 @@ public class CarreraEntity extends GenericTable {
     @Column(name = "NOMBRE")
     private String nombre;
 
-    @OneToMany(mappedBy = "carrera")
+    @OneToMany(mappedBy = "idCarrera")
     private List<UsuarioEntity> usuarios;
 
     @OneToMany(mappedBy = "carrera")

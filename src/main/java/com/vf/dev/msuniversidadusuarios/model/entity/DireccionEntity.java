@@ -1,10 +1,7 @@
 package com.vf.dev.msuniversidadusuarios.model.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -15,11 +12,12 @@ import java.io.Serializable;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class DireccionEntity extends GenericTable implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID_DIRECION")
+    @Column(name = "ID_DIRECCION")
     @JsonIgnore
     private Integer idDireccion;
     @Column(name = "CALLE")

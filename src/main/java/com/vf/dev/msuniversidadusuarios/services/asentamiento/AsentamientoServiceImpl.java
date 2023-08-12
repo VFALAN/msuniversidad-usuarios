@@ -38,4 +38,9 @@ public class AsentamientoServiceImpl implements IAsentamientoService {
         }
         return mComboList;
     }
+
+    @Override
+    public List<AsentamientoEntity> listAllByMunicipio(MunicipioEntity pMunicipioEntity) {
+        return this.iAsentamientoRepository.findAllByMunicipio(pMunicipioEntity);
+    }
 }

@@ -29,7 +29,7 @@ public class PlantelEntity extends GenericTable {
     @OneToMany(mappedBy = "plantel")
     private List<PlantelCarreraEntity> plantelCarreraList;
 
-    @OneToMany(mappedBy = "plantel")
+    @OneToMany(mappedBy = "idPlantel")
     private List<UsuarioEntity> usuarios;
 
 }

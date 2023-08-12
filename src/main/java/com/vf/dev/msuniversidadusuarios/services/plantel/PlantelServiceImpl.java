@@ -43,4 +43,9 @@ public class PlantelServiceImpl implements IPlantelService {
             throw new MsUniversidadException("No se encontro el plantel con el id :" + pIdPlantel, "");
         }
     }
+
+    @Override
+    public List<PlantelEntity> findAllByMunicipio(EstadoEntity pEstadoEntity) {
+       return this.iPlantelRepository.listPlanteles(pEstadoEntity);
+    }
 }

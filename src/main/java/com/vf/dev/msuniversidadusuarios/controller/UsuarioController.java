@@ -3,6 +3,7 @@ package com.vf.dev.msuniversidadusuarios.controller;
 import com.google.gson.Gson;
 import com.vf.dev.msuniversidadusuarios.model.dto.DisponivilidadResponseDTO;
 import com.vf.dev.msuniversidadusuarios.model.dto.PaginationObject;
+import com.vf.dev.msuniversidadusuarios.model.dto.usuario.IUsuarioDetalle;
 import com.vf.dev.msuniversidadusuarios.model.dto.usuario.UsuarioDTO;
 import com.vf.dev.msuniversidadusuarios.model.dto.usuario.UsuarioTableDTO;
 import com.vf.dev.msuniversidadusuarios.model.entity.UsuarioEntity;
@@ -12,12 +13,14 @@ import com.vf.dev.msuniversidadusuarios.utils.exception.MsUniversidadException;
 import com.vf.dev.msuniversidadusuarios.utils.cosnts.EBucket;
 import com.vf.dev.msuniversidadusuarios.utils.cosnts.ETipoArchivo;
 import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.validation.Valid;
 import java.util.Date;
 import java.util.Map;
 
@@ -31,52 +34,51 @@ public class UsuarioController {
     @Autowired
     private IArchivosService iArchivosService;
 
+    @Autowired
+    private ModelMapper modelMapper;
+
     @GetMapping
     public ResponseEntity<?> list(@RequestParam(name = "size", defaultValue = "10") Integer pSize,
                                   @RequestParam(name = "page", defaultValue = "0") Integer pPage,
                                   @RequestParam(name = "column", defaultValue = "idUsuario") String pColumn,
-                                  @RequestParam(name = "order", defaultValue = "desc") String pOrden,
-                                  @RequestParam(name = "filters", required = false) String pFilters) {
-        Map<String, Object> map = pFilters != null ? new Gson().fromJson(pFilters, Map.class) : null;
-        PaginationObject<UsuarioTableDTO> mPaginacionObjectUsuario = this.iUsuarioService.paginar(pSize, pPage, pColumn, pOrden, map);
+                                  @RequestParam(name = "order", required = false) String pOrden,
+                                  @RequestParam(name = "filter", required = false) String pFilters) {
+        Map<String, Object> mapFilters = pFilters != null ? new Gson().fromJson(pFilters, Map.class) : null;
+        Map<String, Object> mapOrder = pOrden != null ? new Gson().fromJson(pOrden, Map.class) : null;
+        PaginationObject<UsuarioTableDTO> mPaginacionObjectUsuario = this.iUsuarioService.paginar(pSize, pPage, pColumn, mapOrder, mapFilters);
+
         return new ResponseEntity<PaginationObject<UsuarioTableDTO>>(mPaginacionObjectUsuario, HttpStatus.OK);
 
     }
 
     @GetMapping("/{pIdUsuario}")
     public ResponseEntity<?> findById(@PathVariable Integer pIdUsuario) throws MsUniversidadException {
-            UsuarioDTO musuarioDto = this.iUsuarioService.getDetail(pIdUsuario);
-            return new ResponseEntity<UsuarioDTO>(musuarioDto, HttpStatus.OK);
+        IUsuarioDetalle musuarioDto = this.iUsuarioService.getDetail(pIdUsuario);
+        return new ResponseEntity<IUsuarioDetalle>(musuarioDto, HttpStatus.OK);
 
 
     }
 
     @PostMapping
-    public ResponseEntity<?> save(@RequestParam("usuario") String pUsuarioJsonStr,
-                                  @RequestParam("fotografia") MultipartFile pArchivoFoto,
-                                  @RequestParam("curp") MultipartFile pArchivoCurp,
-                                  @RequestParam("comprobante") MultipartFile pComprobante,
-                                  @RequestParam("actaNacimiento") MultipartFile pActaNacimiento) throws MsUniversidadException {
+    public ResponseEntity<IUsuarioDetalle> save(@RequestBody @Valid UsuarioDTO pUsusario) throws MsUniversidadException {
 
-            Gson gson = new Gson();
-            UsuarioDTO mUsuarioDTO = gson.fromJson(pUsuarioJsonStr, UsuarioDTO.class);
-            UsuarioEntity mUsuarioEntity = this.iUsuarioService.saveFromDto(mUsuarioDTO);
-            this.iArchivosService.guardarArchivo(pArchivoFoto, ETipoArchivo.FOTOGRAFIA_REGISTRO.getId(), EBucket.BUCKETS_INFORMACION_PERSONAL.getId(), mUsuarioEntity);
-            this.iArchivosService.guardarArchivo(pArchivoCurp, ETipoArchivo.CURP.getId(), EBucket.BUCKETS_INFORMACION_PERSONAL.getId(), mUsuarioEntity);
-            this.iArchivosService.guardarArchivo(pComprobante, ETipoArchivo.COMPROBANTE_DOMICILIO.getId(), EBucket.BUCKETS_INFORMACION_PERSONAL.getId(), mUsuarioEntity);
-            this.iArchivosService.guardarArchivo(pActaNacimiento, ETipoArchivo.ACTA_DE_NACIMINETO.getId(), EBucket.BUCKETS_INFORMACION_PERSONAL.getId(), mUsuarioEntity);
-            mUsuarioDTO = this.iUsuarioService.getDetail(mUsuarioEntity.getIdUsuario());
-            return new ResponseEntity<UsuarioDTO>(mUsuarioDTO, HttpStatus.OK);
+        UsuarioEntity mUsuarioEntity = this.iUsuarioService.saveFromDto(pUsusario);
+        this.iArchivosService.guardarArchivo(pUsusario.getFotografiaFile(), ETipoArchivo.FOTOGRAFIA_REGISTRO.getId(), EBucket.BUCKETS_INFORMACION_PERSONAL.getId(), mUsuarioEntity);
+        this.iArchivosService.guardarArchivo(pUsusario.getCurpFile(), ETipoArchivo.CURP.getId(), EBucket.BUCKETS_INFORMACION_PERSONAL.getId(), mUsuarioEntity);
+        this.iArchivosService.guardarArchivo(pUsusario.getComprobanteFile(), ETipoArchivo.COMPROBANTE_DOMICILIO.getId(), EBucket.BUCKETS_INFORMACION_PERSONAL.getId(), mUsuarioEntity);
+        this.iArchivosService.guardarArchivo(pUsusario.getActaNacimientoFile() , ETipoArchivo.ACTA_DE_NACIMINETO.getId(), EBucket.BUCKETS_INFORMACION_PERSONAL.getId(), mUsuarioEntity);
+        var response = this.iUsuarioService.getDetail(mUsuarioEntity.getIdUsuario());
+        return new ResponseEntity<IUsuarioDetalle>(response, HttpStatus.OK);
 
     }
 
 
     @DeleteMapping("/{idUsuario}")
-    public ResponseEntity<?> delete(@PathVariable Integer idUsuario) throws MsUniversidadException {
+    public ResponseEntity<Boolean> delete(@PathVariable Integer idUsuario) throws MsUniversidadException {
 
-            UsuarioEntity mUsuarioEntity = this.iUsuarioService.findById(idUsuario);
-            this.iUsuarioService.delete(mUsuarioEntity);
-            return new ResponseEntity<>(true, HttpStatus.OK);
+        UsuarioEntity mUsuarioEntity = this.iUsuarioService.findById(idUsuario);
+        this.iUsuarioService.delete(mUsuarioEntity);
+        return new ResponseEntity<>(true, HttpStatus.OK);
 
     }
 
@@ -84,24 +86,50 @@ public class UsuarioController {
     @PutMapping("/disabled")
     public ResponseEntity<?> disabeld(@RequestParam("idUsuario") Integer pIdUsuario) throws MsUniversidadException {
 
-            UsuarioEntity mUsuarioEntity = this.iUsuarioService.findById(pIdUsuario);
+        UsuarioEntity mUsuarioEntity = this.iUsuarioService.findById(pIdUsuario);
 
-            mUsuarioEntity.setIndActivo(!mUsuarioEntity.getIndActivo());
-            if (!mUsuarioEntity.getIndActivo()) {
-                mUsuarioEntity.setFechaBaja(null);
-                mUsuarioEntity.setFechaActualizacion(new Date());
-            } else {
-                mUsuarioEntity.setFechaBaja(new Date());
-            }
-            mUsuarioEntity = this.iUsuarioService.save(mUsuarioEntity);
-            return new ResponseEntity<Integer>(pIdUsuario, HttpStatus.OK);
+        mUsuarioEntity.setIndActivo(!mUsuarioEntity.getIndActivo());
+        if (!mUsuarioEntity.getIndActivo()) {
+            mUsuarioEntity.setFechaBaja(null);
+            mUsuarioEntity.setFechaActualizacion(new Date());
+        } else {
+            mUsuarioEntity.setFechaBaja(new Date());
+        }
+        this.iUsuarioService.save(mUsuarioEntity);
+        return new ResponseEntity<Integer>(pIdUsuario, HttpStatus.OK);
 
     }
 
 
     @PutMapping("/{idUsuario}")
-    public ResponseEntity<?> update(@PathVariable Integer idUsuario, @RequestBody UsuarioDTO usuarioDTO) {
-        return null;
+    public ResponseEntity<?> update(@PathVariable Integer idUsuario,
+                                    @RequestParam("usuario") String pStrUsaurio,
+                                    @RequestParam(name = "fotoRegistro", required = false) MultipartFile pFotoRegistro,
+                                    @RequestParam(name = "idFotoRegistro", required = false) Integer pIdFotoRegistro,
+                                    @RequestParam(name = "idCurp", required = false) Integer pIdCurp,
+                                    @RequestParam(name = "curp", required = false) MultipartFile pCurp,
+                                    @RequestParam(name = "idActaNaciminto", required = false) Integer pIdActaNacimiento,
+                                    @RequestParam(name = "actaNacimiento", required = false) MultipartFile pActaNacimiento,
+                                    @RequestParam(name = "idComprobanteDocimicilio", required = false) Integer pIdComprobante,
+                                    @RequestParam(name = "comprobanteDomicilio", required = false) MultipartFile pComprobanteDomicilio) throws MsUniversidadException {
+        Gson gson = new Gson();
+        UsuarioDTO mUsuarioDTO = gson.fromJson(pStrUsaurio, UsuarioDTO.class);
+        UsuarioEntity mUsuarioEntity = this.modelMapper.map(mUsuarioDTO, UsuarioEntity.class);
+        this.iUsuarioService.update(mUsuarioEntity);
+        if (pIdFotoRegistro != null && pFotoRegistro != null) {
+            this.iArchivosService.updateFile(pFotoRegistro, pIdFotoRegistro);
+        }
+        if (pIdActaNacimiento != null && pActaNacimiento != null) {
+            this.iArchivosService.updateFile(pActaNacimiento, pIdActaNacimiento);
+        }
+        if (pIdComprobante != null && pComprobanteDomicilio != null) {
+            this.iArchivosService.updateFile(pComprobanteDomicilio, pIdComprobante);
+        }
+        if (pIdCurp != null && pCurp != null) {
+            this.iArchivosService.updateFile(pCurp, pIdCurp);
+        }
+        var response = this.iUsuarioService.getDetail(idUsuario);
+        return new ResponseEntity<IUsuarioDetalle>(response, HttpStatus.OK);
     }
 
     @GetMapping("/validarUsuario")
@@ -109,5 +137,17 @@ public class UsuarioController {
         DisponivilidadResponseDTO mDisponivilidadResponseDTO = this.iUsuarioService.validarUsernameAndCorreo(pNombreUsuario, pCorreo);
         return new ResponseEntity<DisponivilidadResponseDTO>(mDisponivilidadResponseDTO, HttpStatus.OK);
     }
+
+    @PostMapping("/masivos")
+    public ResponseEntity<String> masivos(@RequestParam("hombres") MultipartFile pHombresFile,
+                                          @RequestParam("mujeres") MultipartFile pMujeresFile,
+                                          @RequestParam("apellidos") MultipartFile pApellidosFile,
+                                          @RequestParam("estado") Integer idEstado
+    ) throws Exception {
+        this.iUsuarioService.addMasive(pHombresFile, pMujeresFile, pApellidosFile, idEstado);
+        return new ResponseEntity<>("response", HttpStatus.OK);
+    }
 }
+
+
 

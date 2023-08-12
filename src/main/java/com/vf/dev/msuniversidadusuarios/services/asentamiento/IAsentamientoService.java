@@ -12,4 +12,6 @@ public interface IAsentamientoService {
     AsentamientoEntity findById(Integer pAsentamientoId) throws MsUniversidadException;
 
     List<ComboDTO> listByMunicipio(MunicipioEntity pMunicipioEntity);
+
+    List<AsentamientoEntity> listAllByMunicipio(MunicipioEntity pMunicipioEntity);
 }

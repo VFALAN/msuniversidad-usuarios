@@ -30,7 +30,7 @@ public class EstatusEntity extends GenericTable implements Serializable {
     @JsonProperty
     private String nombre;
 
-    @OneToMany(mappedBy = "estatus")
+    @OneToMany(mappedBy = "idEstatus")
     @JsonIgnore
     private List<UsuarioEntity> usuarios;
 }

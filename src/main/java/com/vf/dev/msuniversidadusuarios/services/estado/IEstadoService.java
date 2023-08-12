@@ -10,4 +10,6 @@ public interface IEstadoService {
     EstadoEntity findById(Integer pEstadoId) throws MsUniversidadException;
 
     List<ComboDTO> getAll();
+
+    List<EstadoEntity> getAllEstados();
 }

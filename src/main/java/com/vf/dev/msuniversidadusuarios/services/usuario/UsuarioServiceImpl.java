@@ -2,34 +2,50 @@ package com.vf.dev.msuniversidadusuarios.services.usuario;
 
 import com.vf.dev.msuniversidadusuarios.model.dto.DisponivilidadResponseDTO;
 import com.vf.dev.msuniversidadusuarios.model.dto.PaginationObject;
+import com.vf.dev.msuniversidadusuarios.model.dto.usuario.IUsuarioDetalle;
 import com.vf.dev.msuniversidadusuarios.model.dto.usuario.UsuarioDTO;
 import com.vf.dev.msuniversidadusuarios.model.dto.usuario.UsuarioTableDTO;
 import com.vf.dev.msuniversidadusuarios.model.entity.*;
-import com.vf.dev.msuniversidadusuarios.repository.ICarreraRepository;
 import com.vf.dev.msuniversidadusuarios.repository.IUsuarioRepository;
 import com.vf.dev.msuniversidadusuarios.services.asentamiento.IAsentamientoService;
 import com.vf.dev.msuniversidadusuarios.services.carreras.ICarreraService;
 import com.vf.dev.msuniversidadusuarios.services.direccion.IDireccionService;
+import com.vf.dev.msuniversidadusuarios.services.estado.IEstadoService;
 import com.vf.dev.msuniversidadusuarios.services.estatus.IEstatusService;
+import com.vf.dev.msuniversidadusuarios.services.municipio.IMunicipioService;
 import com.vf.dev.msuniversidadusuarios.services.perfil.IPerfilService;
 import com.vf.dev.msuniversidadusuarios.services.plantel.IPlantelService;
+import com.vf.dev.msuniversidadusuarios.utils.GeneradorDeClaves;
 import com.vf.dev.msuniversidadusuarios.utils.PageUtils;
+import com.vf.dev.msuniversidadusuarios.utils.UsuarioUtils;
 import com.vf.dev.msuniversidadusuarios.utils.cosnts.*;
 import com.vf.dev.msuniversidadusuarios.utils.exception.MsUniversidadException;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Tuple;
 import javax.persistence.criteria.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.function.Function;
 
 @Service
+@Slf4j
 public class UsuarioServiceImpl implements IUsuarioService {
+    private static final String UNSELECT = "unselect";
+    private static final String ASC = "asc";
     @Autowired
     private IUsuarioRepository iUsuarioRepository;
     @Autowired
@@ -49,6 +65,10 @@ public class UsuarioServiceImpl implements IUsuarioService {
     private IPlantelService iPlantelService;
     @Autowired
     private ICarreraService iCarreraService;
+    @Autowired
+    private IEstadoService iEstadoService;
+    @Autowired
+    private IMunicipioService iMunicipioService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -78,19 +98,21 @@ public class UsuarioServiceImpl implements IUsuarioService {
         mDireccionEntity.setIndActivo(true);
         mDireccionEntity.setIdAsentamiento(mAsentamientoEntity);
         mDireccionEntity = this.iDireccionService.save(mDireccionEntity);
-        mUsuarioEntity.setEstatus(mEstatusEntity);
-        mUsuarioEntity.setPerfil(mPerfilEntity);
+        mUsuarioEntity.setIdEstatus(mEstatusEntity);
+        mUsuarioEntity.setIdPerfil(mPerfilEntity);
         mUsuarioEntity.setMatricula(dto.getIdPerfil() == EPerfiles.ID_ALUMNO ? this.buildMatricula(mUsuarioEntity) : null);
         mUsuarioEntity.setPassword(this.passwordEncoder.encode(dto.getPassword()));
         mUsuarioEntity.setIndActivo(true);
         mUsuarioEntity.setFechaAlta(new Date());
         mUsuarioEntity.setIdDireccion(mDireccionEntity);
-        mUsuarioEntity.setPlantel(mPlantelEntity);
-        mUsuarioEntity.setCarrera(mCarreraEntity);
+        mUsuarioEntity.setIdPlantel(mPlantelEntity);
+        mUsuarioEntity.setIdCarrera(mCarreraEntity);
+        mUsuarioEntity.setMatricula(buildMatricula(mUsuarioEntity));
         return this.save(mUsuarioEntity);
     }
 
     @Override
+    @Async
     public UsuarioEntity save(UsuarioEntity pEntity) {
         return this.iUsuarioRepository.save(pEntity);
     }
@@ -114,76 +136,12 @@ public class UsuarioServiceImpl implements IUsuarioService {
     }
 
     @Override
-    public UsuarioDTO getDetail(Integer pId) throws MsUniversidadException {
-        UsuarioEntity mUsuarioEntity = this.findById(pId);
-        return UsuarioDTO.builder()
-                .idUsuario(mUsuarioEntity.getIdUsuario())
-                .nombreUsuario(mUsuarioEntity.getNombreUsuario())
-                .apellidoPaterno(mUsuarioEntity.getApellidoPaterno())
-                .apellidoMaterno(mUsuarioEntity.getApellidoMaterno())
-                .correo(mUsuarioEntity.getCorreo())
-                .curp(mUsuarioEntity.getCurp())
-                .fechaNacimiento(mUsuarioEntity.getFechaNacimiento())
-                .edad(mUsuarioEntity.getEdad())
-                .genero(mUsuarioEntity.getGenero())
-                .desGenero(mUsuarioEntity.getDesGenero())
-                .matricula(mUsuarioEntity.getMatricula())
-                .folio(mUsuarioEntity.getFolio())
-                .idEstatus(mUsuarioEntity
-                        .getEstatus().
-                        getIdEstatus()
-                )
-                .idPerfil(mUsuarioEntity
-                        .getPerfil()
-                        .getIdPerfil()
-                )
-                .idDireccion(mUsuarioEntity.getIdDireccion()
-                        .getIdDireccion()
-                )
-                .calle(mUsuarioEntity.getIdDireccion()
-                        .getCalle()
-                )
-                .desFachada(mUsuarioEntity.getIdDireccion()
-                        .getDesFachada()
-                )
-                .idAsentamiento(mUsuarioEntity.getIdDireccion()
-                        .getIdAsentamiento()
-                        .getIdAsentamientos()
-                )
-                .asentamiento(mUsuarioEntity.getIdDireccion().getIdAsentamiento().getNombre()
-                )
-                .idEstado(mUsuarioEntity.getIdDireccion()
-                        .getIdAsentamiento()
-                        .getIdMunicipio()
-                        .getIdEstado().getIdEstado()
-                )
-                .estado(mUsuarioEntity.getIdDireccion()
-                        .getIdAsentamiento()
-                        .getIdMunicipio()
-                        .getIdEstado()
-                        .getNombre()
-                )
-                .idMunicipio(mUsuarioEntity.getIdDireccion()
-                        .getIdAsentamiento()
-                        .getIdMunicipio()
-                        .getIdMunicipio()
-                )
-                .municipio(mUsuarioEntity.getIdDireccion()
-                        .getIdAsentamiento()
-                        .getIdMunicipio()
-                        .getNombre()
-                )
-                .numeroExterior(mUsuarioEntity.getIdDireccion()
-                        .getNumeroExterior()
-                )
-                .numeroInterior(mUsuarioEntity.getIdDireccion()
-                        .getNumeroInterior()
-                )
-                .build();
+    public IUsuarioDetalle getDetail(Integer pId) throws MsUniversidadException {
+        return this.iUsuarioRepository.getDetail(pId);
     }
 
     @Override
-    public PaginationObject<UsuarioTableDTO> paginar(int size, int page, String column, String orden, Map<String, Object> filters) {
+    public PaginationObject<UsuarioTableDTO> paginar(int size, int page, String column, Map<String, Object> orden, Map<String, Object> filters) {
         int totalPages = 0;
         int firstRow;
         int limit;
@@ -194,7 +152,7 @@ public class UsuarioServiceImpl implements IUsuarioService {
         CriteriaQuery<Tuple> tupleCriteriaQuery = builder.createTupleQuery();
         Root<UsuarioEntity> mUsuarioRoot = tupleCriteriaQuery.from(UsuarioEntity.class);
         List<Predicate> mPredicateList = this.buildPredicates(filters, mUsuarioRoot, builder);
-        Order mOrder = this.buildOrder(builder, mUsuarioRoot, column, orden);
+        List<Order> mOrder = this.buildOrder(builder, mUsuarioRoot, column, orden);
         totalRecords = coutQuery(filters);
         if (totalRecords > 0) {
             totalPages = (int) (totalRecords / size);
@@ -210,18 +168,18 @@ public class UsuarioServiceImpl implements IUsuarioService {
                     mUsuarioRoot.get(UsuarioConstants.apellidoPaterno).alias(UsuarioConstants.APELLIDO_PATERNO),
                     mUsuarioRoot.get(UsuarioConstants.apellidoMaterno).alias(UsuarioConstants.APELLIDO_MATERNO),
                     mUsuarioRoot.get(UsuarioConstants.matricula).alias(UsuarioConstants.MATRICULA),
-                    mUsuarioRoot.get(UsuarioConstants.estatus).get(EstatusConstans.nombre).alias(EstatusConstans.ID_ESTATUS),
-                    mUsuarioRoot.get(UsuarioConstants.perfil).get(PerfilConstans.nombre).alias(PerfilConstans.ID_PERFIL),
+                    mUsuarioRoot.get(UsuarioConstants.idEstatus).get(EstatusConstans.nombre).alias(EstatusConstans.ID_ESTATUS),
+                    mUsuarioRoot.get(UsuarioConstants.idPerfil).get(PerfilConstans.nombre).alias(PerfilConstans.ID_PERFIL),
                     mUsuarioRoot.get(UsuarioConstants.folio).alias(UsuarioConstants.FOLIO),
                     mUsuarioRoot.get(UsuarioConstants.idDireccion)
-                            .get("idAsentamiento").get("nombre").alias("ASENTAMIENTO"),
+                            .get(DireccionCosntans.IDASENTAMIENTO).get(DireccionCosntans.NOMBRE).alias("ASENTAMIENTO"),
                     mUsuarioRoot.get(UsuarioConstants.idDireccion)
-                            .get("idAsentamiento").get("codigoPostal").alias("CODIGO_POSTAL"),
+                            .get(DireccionCosntans.IDASENTAMIENTO).get(DireccionCosntans.CODIGOPOSTAL).alias("CODIGO_POSTAL"),
                     mUsuarioRoot.get(UsuarioConstants.idDireccion)
-                            .get("idAsentamiento").get("idMunicipio").get("nombre").alias("MUNICIPIO"),
+                            .get(DireccionCosntans.IDASENTAMIENTO).get(DireccionCosntans.IDMUNICIPIO).get(DireccionCosntans.NOMBRE).alias("MUNICIPIO"),
                     mUsuarioRoot.get(UsuarioConstants.idDireccion)
-                            .get("idAsentamiento").get("idMunicipio")
-                            .get("idEstado").get("nombre").alias("ESTADO")
+                            .get(DireccionCosntans.IDASENTAMIENTO).get(DireccionCosntans.IDMUNICIPIO)
+                            .get(DireccionCosntans.IDESTADO).get(DireccionCosntans.NOMBRE).alias("ESTADO")
             ).where(mPredicateList.toArray(new Predicate[0])).orderBy(mOrder);
 
             List<Tuple> mTupleList = entityManager.createQuery(tupleCriteriaQuery)
@@ -249,57 +207,70 @@ public class UsuarioServiceImpl implements IUsuarioService {
         return this.entityManager.createQuery(mCriteriaQueryLong).getSingleResult();
     }
 
-    private Order buildOrder(CriteriaBuilder pBuilder, Root<UsuarioEntity> pUsaurioEntityRoot, String column, String order) {
-        boolean isAsc = order.toLowerCase().equals("asc");
-        Order mOrder = null;
-        switch (column) {
-            case FiltersConst.NOMBRE ->
-                    mOrder = isAsc ? pBuilder.asc(pUsaurioEntityRoot.get(UsuarioConstants.nombre)) : pBuilder.desc(pUsaurioEntityRoot.get(UsuarioConstants.nombre));
-            case FiltersConst.PATERNO ->
-                    mOrder = isAsc ? pBuilder.asc(pUsaurioEntityRoot.get(UsuarioConstants.apellidoPaterno)) : pBuilder.desc(pUsaurioEntityRoot.get(UsuarioConstants.apellidoPaterno));
-            case FiltersConst.MATERNO ->
-                    mOrder = isAsc ? pBuilder.asc(pUsaurioEntityRoot.get(UsuarioConstants.apellidoMaterno)) : pBuilder.desc(pUsaurioEntityRoot.get(UsuarioConstants.apellidoMaterno));
-            case FiltersConst.PERFIL ->
-                    mOrder = isAsc ? pBuilder.asc(pUsaurioEntityRoot.join(UsuarioConstants.idPerfil, JoinType.INNER).get(PerfilConstans.nombre)) : pBuilder.desc(pUsaurioEntityRoot.join(UsuarioConstants.idPerfil, JoinType.INNER).get(PerfilConstans.nombre));
-            case FiltersConst.ESTATUS ->
-                    mOrder = isAsc ? pBuilder.asc(pUsaurioEntityRoot.join(UsuarioConstants.estatus, JoinType.INNER).get(EstatusConstans.nombre)) : pBuilder.desc(pUsaurioEntityRoot.join(UsuarioConstants.estatus, JoinType.INNER).get(EstatusConstans.nombre));
 
-            case FiltersConst.FOLIO ->
-                    mOrder = isAsc ? pBuilder.asc(pUsaurioEntityRoot.get(UsuarioConstants.folio)) : pBuilder.desc(pUsaurioEntityRoot.get(UsuarioConstants.folio));
-            case FiltersConst.ASENTAMINETO -> mOrder = isAsc ? pBuilder.asc(pBuilder.upper(
-                    pUsaurioEntityRoot.get(UsuarioConstants.idDireccion)
-                            .get("idAsentamiento")
-                            .get("nombre")
-            )) : pBuilder.desc(pBuilder.upper(
-                    pUsaurioEntityRoot.get(UsuarioConstants.idDireccion)
-                            .get("idAsentamiento")
-                            .get("nombre")
-            ));
-            case FiltersConst.CODIGOPOSTAL -> mOrder = isAsc ? pBuilder.asc(pUsaurioEntityRoot.get(
-                    UsuarioConstants.idDireccion).get("idAsentamiento").get("codigoPostal")
-            ) : pBuilder.desc(pUsaurioEntityRoot.get(
-                    UsuarioConstants.idDireccion).get("idAsentamiento").get("codigoPostal")
-            );
-            case FiltersConst.MUNICIPIO ->
-                    mOrder = isAsc ? pBuilder.asc(pUsaurioEntityRoot.get(UsuarioConstants.idDireccion)
-                            .get("idAsentamiento")
-                            .get("idMunicipio")
-                            .get("nombre")) : pBuilder.desc(pUsaurioEntityRoot.get(UsuarioConstants.idDireccion)
-                            .get("idAsentamiento")
-                            .get("idMunicipio")
-                            .get("nombre"));
-            case FiltersConst.ESTADO ->
-                    mOrder = isAsc ? pBuilder.asc(pUsaurioEntityRoot.get(UsuarioConstants.idDireccion)
-                            .get("idAsentamiento")
-                            .get("idMunicipio")
-                            .get("idEstado")
-                            .get("nombre")) : pBuilder.desc(pUsaurioEntityRoot.get(UsuarioConstants.idDireccion)
-                            .get("idAsentamiento")
-                            .get("idMunicipio")
-                            .get("idEstado")
-                            .get("nombre"));
-            default -> mOrder = pBuilder.asc(pUsaurioEntityRoot.get(UsuarioConstants.idUsuario));
+    private List<Order> buildOrder(CriteriaBuilder pBuilder, Root<UsuarioEntity> pUsaurioEntityRoot, String column, Map<String, Object> order) {
+        List<Order> mOrder = new ArrayList<>();
+
+        if (order != null && !order.isEmpty()) {
+            if (order.containsKey(FiltersConst.NOMBRE) && !Objects.equals(order.get(FiltersConst.NOMBRE), UNSELECT)) {
+                boolean isAsc = order.get(FiltersConst.NOMBRE).equals(ASC);
+                var path = pUsaurioEntityRoot.get(UsuarioConstants.nombre);
+                mOrder.add(isAsc ? pBuilder.asc(path) : pBuilder.desc(path));
+            }
+            if (order.containsKey(FiltersConst.PATERNO) && !Objects.equals(order.get(FiltersConst.PATERNO), UNSELECT)) {
+                boolean isAsc = order.get(FiltersConst.PATERNO).equals(ASC);
+                var path = pUsaurioEntityRoot.get(UsuarioConstants.apellidoPaterno);
+                mOrder.add(isAsc ? pBuilder.asc(path) : pBuilder.desc(path));
+            }
+            if (order.containsKey(FiltersConst.MATERNO) && !Objects.equals(order.get(FiltersConst.PATERNO), UNSELECT)) {
+                boolean isAsc = order.get(FiltersConst.MATERNO).equals(ASC);
+                var path = pUsaurioEntityRoot.get(UsuarioConstants.apellidoMaterno);
+                mOrder.add(isAsc ? pBuilder.asc(path) : pBuilder.desc(path));
+            }
+            if (order.containsKey(FiltersConst.PERFIL) && !Objects.equals(order.get(FiltersConst.PERFIL), UNSELECT)) {
+                boolean isAsc = order.get(FiltersConst.PERFIL).equals(ASC);
+                var path = pUsaurioEntityRoot.join(UsuarioConstants.idPerfil, JoinType.INNER).get(PerfilConstans.nombre);
+                mOrder.add(isAsc ? pBuilder.asc(path) : pBuilder.desc(path));
+            }
+            if (order.containsKey(FiltersConst.ESTATUS) && !Objects.equals(order.get(FiltersConst.ESTATUS), UNSELECT)) {
+                boolean isAsc = order.get(FiltersConst.ESTATUS).equals(ASC);
+                var path = pUsaurioEntityRoot.join(UsuarioConstants.estatus, JoinType.INNER).get(EstatusConstans.nombre);
+                mOrder.add(isAsc ? pBuilder.asc(path) : pBuilder.desc(path));
+            }
+            if (order.containsKey(FiltersConst.ASENTAMINETO) && !Objects.equals(order.get(FiltersConst.ASENTAMINETO), UNSELECT)) {
+                boolean isAsc = order.get(FiltersConst.ASENTAMINETO).equals(ASC);
+                var path = pBuilder.upper(
+                        pUsaurioEntityRoot.get(UsuarioConstants.idDireccion)
+                                .get(DireccionCosntans.IDASENTAMIENTO)
+                                .get(DireccionCosntans.NOMBRE)
+                );
+                mOrder.add(isAsc ? pBuilder.asc(path) : pBuilder.desc(path));
+            }
+            if (order.containsKey(FiltersConst.CODIGOPOSTAL) && !Objects.equals(order.get(FiltersConst.CODIGOPOSTAL), UNSELECT)) {
+                boolean isAsc = order.get(FiltersConst.CODIGOPOSTAL).equals(ASC);
+                var path = pUsaurioEntityRoot.get(
+                        UsuarioConstants.idDireccion).get(DireccionCosntans.IDASENTAMIENTO).get(DireccionCosntans.CODIGOPOSTAL);
+                mOrder.add(isAsc ? pBuilder.asc(path) : pBuilder.desc(path));
+            }
+            if (order.containsKey(FiltersConst.MUNICIPIO) && !Objects.equals(order.get(FiltersConst.MUNICIPIO), UNSELECT)) {
+                boolean isAsc = order.get(FiltersConst.MUNICIPIO).equals(ASC);
+                var path = pUsaurioEntityRoot.get(UsuarioConstants.idDireccion)
+                        .get(DireccionCosntans.IDASENTAMIENTO)
+                        .get(DireccionCosntans.IDMUNICIPIO)
+                        .get(DireccionCosntans.NOMBRE);
+                mOrder.add(isAsc ? pBuilder.asc(path) : pBuilder.desc(path));
+            }
+            if (order.containsKey(FiltersConst.ESTADO) && !Objects.equals(order.get(FiltersConst.ESTADO), UNSELECT)) {
+                boolean isAsc = order.get(FiltersConst.ESTADO).equals(ASC);
+                var path = pUsaurioEntityRoot.get(UsuarioConstants.idDireccion)
+                        .get(DireccionCosntans.IDASENTAMIENTO)
+                        .get(DireccionCosntans.IDMUNICIPIO)
+                        .get(DireccionCosntans.IDESTADO)
+                        .get(DireccionCosntans.NOMBRE);
+                mOrder.add(isAsc ? pBuilder.asc(path) : pBuilder.desc(path));
+            }
         }
+        //  boolean isAsc = order.toLowerCase().equals("asc");
 
         return mOrder;
     }
@@ -309,27 +280,27 @@ public class UsuarioServiceImpl implements IUsuarioService {
         if (filters != null && !filters.isEmpty()) {
             if (filters.containsKey(FiltersConst.NOMBRE) && filters.get(FiltersConst.NOMBRE) != null) {
                 String mStringFilter = (String) filters.get(FiltersConst.NOMBRE);
-                mListPredicateList.add(builder.like(pRoot.get(UsuarioConstants.nombre), "%" + mStringFilter.toUpperCase() + "%"));
+                mListPredicateList.add(builder.like(pRoot.get(UsuarioConstants.nombre), mStringFilter.toUpperCase() + "%"));
             }
             if (filters.containsKey(FiltersConst.FOLIO) && filters.get(FiltersConst.FOLIO) != null) {
                 String mStringFilter = (String) filters.get(FiltersConst.FOLIO);
-                mListPredicateList.add(builder.like(pRoot.get(UsuarioConstants.folio), "%" + mStringFilter.toUpperCase() + "%"));
+                mListPredicateList.add(builder.like(pRoot.get(UsuarioConstants.folio), mStringFilter.toUpperCase() + "%"));
             }
             if (filters.containsKey(FiltersConst.PATERNO) && filters.get(FiltersConst.PATERNO) != null) {
                 String mStringFilter = (String) filters.get(FiltersConst.PATERNO);
-                mListPredicateList.add(builder.like(pRoot.get(UsuarioConstants.apellidoPaterno), "%" + mStringFilter.toUpperCase() + "%"));
+                mListPredicateList.add(builder.like(pRoot.get(UsuarioConstants.apellidoPaterno), mStringFilter.toUpperCase() + "%"));
             }
             if (filters.containsKey(FiltersConst.MATERNO) && filters.get(FiltersConst.MATERNO) != null) {
                 String mStringFilter = (String) filters.get(FiltersConst.MATERNO);
-                mListPredicateList.add(builder.like(pRoot.get(UsuarioConstants.apellidoMaterno), "%" + mStringFilter.toUpperCase() + "%"));
+                mListPredicateList.add(builder.like(pRoot.get(UsuarioConstants.apellidoMaterno), mStringFilter.toUpperCase() + "%"));
             }
             if (filters.containsKey(FiltersConst.PERFIL) && filters.get(FiltersConst.PERFIL) != null) {
                 String mStringFilter = (String) filters.get(FiltersConst.PERFIL);
-                mListPredicateList.add(builder.like(pRoot.join(UsuarioConstants.idPerfil, JoinType.INNER).get(PerfilConstans.nombre), "%" + mStringFilter.toUpperCase() + "%"));
+                mListPredicateList.add(builder.like(pRoot.join(UsuarioConstants.idPerfil, JoinType.INNER).get(PerfilConstans.nombre), mStringFilter.toUpperCase() + "%"));
             }
             if (filters.containsKey(FiltersConst.ESTATUS) && filters.get(FiltersConst.ESTATUS) != null) {
                 String mStringFilter = (String) filters.get(FiltersConst.ESTATUS);
-                mListPredicateList.add(builder.like(pRoot.join(UsuarioConstants.estatus, JoinType.INNER).get(EstatusConstans.nombre), "%" + mStringFilter.toUpperCase() + "%"));
+                mListPredicateList.add(builder.like(pRoot.join(UsuarioConstants.estatus, JoinType.INNER).get(EstatusConstans.nombre), mStringFilter.toUpperCase() + "%"));
             }
             if (filters.containsKey(FiltersConst.ASENTAMINETO) && filters.get(FiltersConst.ASENTAMINETO) != null) {
                 String mStringFilter = (String) filters.get(FiltersConst.ASENTAMINETO);
@@ -337,8 +308,8 @@ public class UsuarioServiceImpl implements IUsuarioService {
                         builder.like(
                                 builder.upper(
                                         pRoot.get(UsuarioConstants.idDireccion)
-                                                .get("idAsentamiento")
-                                                .get("nombre")
+                                                .get(DireccionCosntans.IDASENTAMIENTO)
+                                                .get(DireccionCosntans.NOMBRE)
                                 )
                                 , "%" + mStringFilter.toUpperCase() + "%"
                         )
@@ -346,16 +317,16 @@ public class UsuarioServiceImpl implements IUsuarioService {
             }
             if (filters.containsKey(FiltersConst.CODIGOPOSTAL) && filters.get(FiltersConst.CODIGOPOSTAL) != null) {
                 String mStringFilter = (String) filters.get(FiltersConst.CODIGOPOSTAL);
-                mListPredicateList.add(builder.like(pRoot.get(UsuarioConstants.idDireccion).get("idAsentamiento").get("codigoPostal"), "%" + mStringFilter));
+                mListPredicateList.add(builder.like(pRoot.get(UsuarioConstants.idDireccion).get(DireccionCosntans.IDASENTAMIENTO).get(DireccionCosntans.CODIGOPOSTAL), "%" + mStringFilter));
             }
             if (filters.containsKey(FiltersConst.MUNICIPIO) && filters.get(FiltersConst.MUNICIPIO) != null) {
                 String mStringFilter = (String) filters.get(FiltersConst.MUNICIPIO);
                 mListPredicateList.add(
                         builder.like(
                                 builder.upper(pRoot.get(UsuarioConstants.idDireccion)
-                                        .get("idAsentamiento")
-                                        .get("idMunicipio")
-                                        .get("nombre")
+                                        .get(DireccionCosntans.IDASENTAMIENTO)
+                                        .get(DireccionCosntans.IDMUNICIPIO)
+                                        .get(DireccionCosntans.NOMBRE)
                                 ), "%" + mStringFilter.toUpperCase() + "%"
                         )
                 );
@@ -365,10 +336,10 @@ public class UsuarioServiceImpl implements IUsuarioService {
                 mListPredicateList.add(
                         builder.like(
                                 builder.upper(pRoot.get(UsuarioConstants.idDireccion)
-                                        .get("idAsentamiento")
-                                        .get("idMunicipio")
-                                        .get("idEstado")
-                                        .get("nombre")
+                                        .get(DireccionCosntans.IDASENTAMIENTO)
+                                        .get(DireccionCosntans.IDMUNICIPIO)
+                                        .get(DireccionCosntans.IDESTADO)
+                                        .get(DireccionCosntans.NOMBRE)
                                 ), "%" + mStringFilter.toUpperCase() + "%"
                         )
                 );
@@ -412,9 +383,11 @@ public class UsuarioServiceImpl implements IUsuarioService {
     private String buildMatricula(UsuarioEntity pUsuarioEntity) {
         String mStringMatricula = "";
         SimpleDateFormat mSimpleDateFormat = new SimpleDateFormat("YYYY/MM/dd");
-        mStringMatricula += mSimpleDateFormat.format(new Date()).replaceAll("/", "");
-        mStringMatricula += pUsuarioEntity.getPlantel().getClave();
-        mStringMatricula += this.consecutivo(pUsuarioEntity.getPlantel(), pUsuarioEntity.getCarrera());
+        if (!pUsuarioEntity.getIdPerfil().getIdPerfil().equals(EPerfiles.ID_ADMIN)) {
+            mStringMatricula += mSimpleDateFormat.format(new Date()).replaceAll("/", "");
+            mStringMatricula += pUsuarioEntity.getIdPlantel().getClave();
+            //  mStringMatricula += this.consecutivo(pUsuarioEntity.getIdPlantel(), pUsuarioEntity.getIdCarrera());
+        }
         return mStringMatricula;
     }
 
@@ -424,11 +397,136 @@ public class UsuarioServiceImpl implements IUsuarioService {
         CriteriaQuery<Long> mLongCriteriaQuery = mCriteriaBuilder.createQuery(Long.class);
         Root<UsuarioEntity> mUsuarioEntityRoot = mLongCriteriaQuery.from(UsuarioEntity.class);
         List<Predicate> predicateList = new ArrayList<>();
-        predicateList.add(mCriteriaBuilder.equal(mUsuarioEntityRoot.get("plantel"), pPlantelEntity));
-        predicateList.add(mCriteriaBuilder.equal(mUsuarioEntityRoot.get("carrera"), pCarreraEntity));
+        predicateList.add(mCriteriaBuilder.equal(mUsuarioEntityRoot.get("idPlantel"), pPlantelEntity));
+        predicateList.add(mCriteriaBuilder.equal(mUsuarioEntityRoot.get("idCarrera"), pCarreraEntity));
         mLongCriteriaQuery.select(mCriteriaBuilder.count(mUsuarioEntityRoot)).where(predicateList.toArray(new Predicate[0]));
         Long count = entityManager.createQuery(mLongCriteriaQuery).getSingleResult();
         count = count == 0 ? count++ : count;
         return String.format("%06d", count);
+    }
+
+    private String[] getArray(MultipartFile file) throws IOException {
+        List<String> list = new ArrayList<>();
+        InputStream inputStream = file.getInputStream();
+        new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8)).lines()
+                .forEach(line -> {
+                    if (!line.equals("")) {
+                        list.add(line);
+                    }
+                });
+        return list.toArray(new String[0]);
+    }
+
+    @Async
+    public void addMasive(MultipartFile hombres, MultipartFile mujeres, MultipartFile pApellidos, Integer idEstado) throws Exception {
+        GeneradorDeClaves GENERARDOR = new GeneradorDeClaves();
+        var nombresHombre = this.getArray(hombres);
+        var nombresMujer = this.getArray(mujeres);
+        var apellidos = this.getArray(pApellidos);
+        String mStrResult = "";
+        // var e = this.iEstadoService.findById(idEstado);
+        var estados = this.iEstadoService.getAllEstados();
+        var perfil = this.iPerfilService.findById(2);
+        var estatus = this.iEstatusService.findById(1);
+        estados.forEach(e -> {
+            try {
+                Runnable task = () -> {
+                    try {
+                        this.addNewUser(e, perfil, estatus, nombresHombre, nombresMujer, apellidos);
+                    } catch (Exception ex) {
+                        throw new RuntimeException(ex);
+                    }
+                };
+                Thread thread = new Thread(task);
+                thread.start();
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        });
+
+
+    }
+
+
+    private void addNewUser(EstadoEntity estado, PerfilEntity perfil, EstatusEntity estatus, String[] nombresHombre, String[] nombresMujer, String[] apellidos) throws Exception {
+        log.info("Inciando con el estado: " + estado.getNombre());
+
+        var planteles = this.iPlantelService.findAllByMunicipio(estado);
+        int i = 1;
+        for (var plantel : planteles) {
+            List<UsuarioEntity> usuarioEntities = new ArrayList<>();
+            var asentamientos = this.iAsentamientoService.listAllByMunicipio(plantel.getIdMunicipio());
+            for (var asentamiento : asentamientos) {
+
+                log.info("@MSU-----> " + asentamiento.getNombre());
+
+
+                for (int j = 1; j < 4; j++) {
+                    try {
+
+                        var direccion = DireccionEntity.builder()
+                                .desFachada("n/a")
+                                .numeroExterior("n/a")
+                                .numeroInterior("b/a")
+                                .idAsentamiento(asentamiento)
+                                .calle("normal")
+                                .build();
+                        //  direccion = this.iDireccionService.save(direccion);
+                        var nombre = (j % 2 == 0) ? nombresHombre[UsuarioUtils.getRamndomNumberRange(1, nombresHombre.length)] : nombresMujer[UsuarioUtils.getRamndomNumberRange(1, nombresMujer.length)];
+                        var aPaterno = apellidos[UsuarioUtils.getRamndomNumberRange(1, apellidos.length)];
+                        var genero = (j % 2 == 0) ? 1 : 2;
+                        var desGenero = (genero == 1) ? "MASCULINO" : "FEMENINO";
+                        var aMaterno = apellidos[UsuarioUtils.getRamndomNumberRange(1, apellidos.length)];
+                        var fechaNacimiento = UsuarioUtils.generateRandomDate();
+                        var edad = UsuarioUtils.getEdad(fechaNacimiento);
+                        var random = GeneradorDeClaves.generar(4, 0, 0, 0);
+                        var curp = UsuarioUtils.getCurp(nombre, aPaterno, aMaterno, fechaNacimiento, estado.getNombreAbrebiado(), random, i);
+                        var carrera = this.iCarreraService.findById(UsuarioUtils.getRamndomNumberRange(1, 6));
+                        var password = GeneradorDeClaves.generar(12, 30, 30, 40);
+                        var usuario = UsuarioEntity.builder()
+                                .nombre(nombre)
+                                .apellidoMaterno(aMaterno)
+                                .genero(genero)
+                                .desGenero(desGenero)
+                                .apellidoPaterno(aPaterno)
+                                .correo(curp.concat("@gmail.com"))
+                                .curp(curp)
+                                .fechaNacimiento(fechaNacimiento)
+                                .edad(edad)
+                                .idDireccion(direccion)
+                                .idPerfil(perfil)
+                                .idPlantel(plantel)
+                                .idEstatus(estatus)
+                                .idCarrera(carrera)
+                                .build();
+                        usuario.setMatricula(this.buildMatricula(usuario) + curp);
+                        usuario.setNombreUsuario(usuario.getCurp().concat(usuario.getMatricula()));
+                        usuario.setFechaAlta(new Date());
+                        usuario.setIndActivo(true);
+                        usuario.setPassword(this.passwordEncoder.encode(password));
+                        //  log.info(+j +"asentamiento: " + asentamiento.getNombre() + " " + " Usuario creado: " + " nombreUsuario: " + usuario.getNombreUsuario() + " password: " + password);
+                        usuarioEntities.add(usuario);
+                        //   this.save(usuario);
+                    } catch (Exception e) {
+                        log.info(e.getMessage());
+                    }
+                }
+
+
+                //   this.addAll(usuarioEntities);
+                //    log.info("guardando: " + usuarioEntities.size() + " del estado: " + estado.getNombre());
+            }
+
+            log.info("guardando: " + usuarioEntities.size());
+            this.addAll(usuarioEntities);
+            //  this.addAll(usuarioEntities);
+        }
+
+    }
+
+    @Async
+    public void addAll(List<UsuarioEntity> list) {
+        this.iUsuarioRepository.saveAll(list);
+        log.info("Guardados");
     }
 }

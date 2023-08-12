@@ -65,7 +65,7 @@ public class DireccionServiceImpl implements IDireccionService {
     }
 
     @Override
-    public PaginationObject<DireccionTableDTO> paginar(int size, int page, String column, String orden, Map<String , Object> filters) {
+    public PaginationObject<DireccionTableDTO> paginar(int size, int page, String column, Map<String , Object>order, Map<String , Object> filters) {
         return null;
     }
 }

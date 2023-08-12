@@ -6,6 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface IArchivosService {
 
-    String guardarArchivo(MultipartFile pFile, Integer tipoArchivo, Integer Bucket ,UsuarioEntity pUsuario) throws MsUniversidadException;
+    void guardarArchivo(MultipartFile pFile, Integer tipoArchivo, Integer Bucket ,UsuarioEntity pUsuario) throws MsUniversidadException;
+    void updateFile(MultipartFile pFile,Integer idArchivo) throws MsUniversidadException;
 
 }

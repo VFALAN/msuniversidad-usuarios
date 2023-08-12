@@ -13,4 +13,6 @@ public interface IPlantelService {
     public List<ComboDTO> listPlateles(EstadoEntity pEstadoEntity);
 
     PlantelEntity findById(Integer pIdPlantel) throws MsUniversidadException;
+
+    List<PlantelEntity> findAllByMunicipio(EstadoEntity pEstadoEntity);
 }

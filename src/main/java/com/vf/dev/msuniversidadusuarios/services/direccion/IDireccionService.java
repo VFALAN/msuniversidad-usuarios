@@ -5,5 +5,5 @@ import com.vf.dev.msuniversidadusuarios.model.dto.direccion.DireccionTableDTO;
 import com.vf.dev.msuniversidadusuarios.model.entity.DireccionEntity;
 import com.vf.dev.msuniversidadusuarios.services.generic.IGenericService;
 
-public interface IDireccionService extends IGenericService<DireccionEntity , DireccionDTO, DireccionTableDTO> {
+public interface IDireccionService extends IGenericService<DireccionEntity , DireccionDTO, DireccionTableDTO,DireccionDTO> {
 }

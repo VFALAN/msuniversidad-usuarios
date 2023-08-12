@@ -64,20 +64,20 @@ public class UsuarioEntity extends GenericTable {
     @JoinColumn(name = "ID_PERFIL")
     @ManyToOne
     @Basic(optional = false)
-    private PerfilEntity perfil;
+    private PerfilEntity idPerfil;
     @JsonIgnore
     @JoinColumn(name = "ID_ESTATUS")
     @ManyToOne
-    private EstatusEntity estatus;
+    private EstatusEntity idEstatus;
 
 
     @ManyToOne
     @JoinColumn(name = "ID_PLANTEL")
-    private PlantelEntity plantel;
+    private PlantelEntity idPlantel;
 
     @ManyToOne
     @JoinColumn(name = "ID_CARRERA")
-    private CarreraEntity carrera;
+    private CarreraEntity idCarrera;
 
     @JsonIgnore
     @OneToOne(cascade = CascadeType.ALL)

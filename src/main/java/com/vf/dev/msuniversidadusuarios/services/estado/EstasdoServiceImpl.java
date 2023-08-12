@@ -40,4 +40,9 @@ public class EstasdoServiceImpl implements IEstadoService {
         }
 
     }
+
+    @Override
+    public List<EstadoEntity> getAllEstados() {
+        return this.iEstadoRepository.findAll();
+    }
 }

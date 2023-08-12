@@ -28,7 +28,7 @@ public class PerfilEntity extends GenericTable implements Serializable {
     @Column(name = "NOMBRE")
     @JsonIgnore
     private String nombre;
-    @OneToMany(mappedBy = "perfil")
+    @OneToMany(mappedBy = "idPerfil")
     private List<UsuarioEntity> usuarios;
 
 
