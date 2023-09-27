@@ -31,10 +31,10 @@ public class AsentamientoServiceImpl implements IAsentamientoService {
     public List<ComboDTO> listByMunicipio(MunicipioEntity pMunicipioEntity) {
         List<ComboDTO> mComboList = new ArrayList<>();
         List<AsentamientoEntity> mAsentamientoList = this.iAsentamientoRepository.findAllByMunicipio(pMunicipioEntity);
-        if(!mAsentamientoList.isEmpty()){
-            mAsentamientoList.forEach( m ->{
-                mComboList.add(ComboDTO.builder().value(m.getIdAsentamientos().toString()).label(m.getCodigoPostal() + " / " + m.getNombre().toUpperCase()).build());
-            });
+        if (!mAsentamientoList.isEmpty()) {
+            mAsentamientoList.forEach(m ->
+                    mComboList.add(ComboDTO.builder().value(m.getIdAsentamientos().toString()).label(m.getCodigoPostal() + " / " + m.getNombre().toUpperCase()).build())
+            );
         }
         return mComboList;
     }

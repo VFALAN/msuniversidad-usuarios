@@ -32,12 +32,12 @@ public class CarreraServiceImpl implements ICarreraService {
         List<ComboDTO> mComboDTOList = new ArrayList<>();
         List<CarreraEntity> mCarreraEntityList = this.iCarreraRepository.findByPlantel(plantelEntity);
         if (mCarreraEntityList != null && !mCarreraEntityList.isEmpty()) {
-            mCarreraEntityList.forEach(c -> {
-                mComboDTOList.add(ComboDTO.builder()
-                        .label(c.getNombre())
-                        .value(c.getIdCarrera().toString())
-                        .build());
-            });
+            mCarreraEntityList.forEach(c ->
+                    mComboDTOList.add(ComboDTO.builder()
+                            .label(c.getNombre())
+                            .value(c.getIdCarrera().toString())
+                            .build())
+            );
         }
 
         return mComboDTOList;
