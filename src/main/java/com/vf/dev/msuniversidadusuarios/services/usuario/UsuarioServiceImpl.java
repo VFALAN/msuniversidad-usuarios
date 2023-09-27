@@ -1,5 +1,8 @@
 package com.vf.dev.msuniversidadusuarios.services.usuario;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.vf.dev.msuniversidadusuarios.model.dto.DisponivilidadResponseDTO;
 import com.vf.dev.msuniversidadusuarios.model.dto.PaginationObject;
 import com.vf.dev.msuniversidadusuarios.model.dto.usuario.IUsuarioDetalle;
@@ -12,40 +15,36 @@ import com.vf.dev.msuniversidadusuarios.services.carreras.ICarreraService;
 import com.vf.dev.msuniversidadusuarios.services.direccion.IDireccionService;
 import com.vf.dev.msuniversidadusuarios.services.estado.IEstadoService;
 import com.vf.dev.msuniversidadusuarios.services.estatus.IEstatusService;
+import com.vf.dev.msuniversidadusuarios.services.msexcelexport.IMsExcelExport;
 import com.vf.dev.msuniversidadusuarios.services.municipio.IMunicipioService;
 import com.vf.dev.msuniversidadusuarios.services.perfil.IPerfilService;
 import com.vf.dev.msuniversidadusuarios.services.plantel.IPlantelService;
-import com.vf.dev.msuniversidadusuarios.utils.GeneradorDeClaves;
-import com.vf.dev.msuniversidadusuarios.utils.PageUtils;
-import com.vf.dev.msuniversidadusuarios.utils.UsuarioUtils;
+import com.vf.dev.msuniversidadusuarios.utils.TupleUtils;
 import com.vf.dev.msuniversidadusuarios.utils.cosnts.*;
 import com.vf.dev.msuniversidadusuarios.utils.exception.MsUniversidadException;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Tuple;
+import jakarta.persistence.criteria.*;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
-import javax.persistence.Tuple;
-import javax.persistence.criteria.*;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.function.Function;
 
 @Service
 @Slf4j
 public class UsuarioServiceImpl implements IUsuarioService {
     private static final String UNSELECT = "unselect";
     private static final String ASC = "asc";
+    @Value("${msuniversidad.queue.expor-usuario-list}")
+    private String routingKey;
     @Autowired
     private IUsuarioRepository iUsuarioRepository;
     @Autowired
@@ -69,7 +68,10 @@ public class UsuarioServiceImpl implements IUsuarioService {
     private IEstadoService iEstadoService;
     @Autowired
     private IMunicipioService iMunicipioService;
-
+    @Autowired
+    private IMsExcelExport iMsExcelExport;
+    @Autowired
+    RabbitTemplate rabbitTemplate;
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -152,7 +154,7 @@ public class UsuarioServiceImpl implements IUsuarioService {
         CriteriaQuery<Tuple> tupleCriteriaQuery = builder.createTupleQuery();
         Root<UsuarioEntity> mUsuarioRoot = tupleCriteriaQuery.from(UsuarioEntity.class);
         List<Predicate> mPredicateList = this.buildPredicates(filters, mUsuarioRoot, builder);
-        List<Order> mOrder = this.buildOrder(builder, mUsuarioRoot, column, orden);
+        List<Order> mOrder = this.buildOrder(builder, mUsuarioRoot, orden);
         totalRecords = coutQuery(filters);
         if (totalRecords > 0) {
             totalPages = (int) (totalRecords / size);
@@ -181,12 +183,16 @@ public class UsuarioServiceImpl implements IUsuarioService {
                             .get(DireccionCosntans.IDASENTAMIENTO).get(DireccionCosntans.IDMUNICIPIO)
                             .get(DireccionCosntans.IDESTADO).get(DireccionCosntans.NOMBRE).alias("ESTADO")
             ).where(mPredicateList.toArray(new Predicate[0])).orderBy(mOrder);
+            //     Query temp = entityManager.createQuery(tupleCriteriaQuery);
+            //         String queryString = temp.unwrap(org.hibernate.query.Query.class).getQueryString().;
+//            log.info(queryString);
+//            var q2 = entityManager.createQuery(queryString, Tuple.class).getResultList();
 
             List<Tuple> mTupleList = entityManager.createQuery(tupleCriteriaQuery)
                     .setMaxResults(size).setFirstResult(firstRow).getResultList();
             if (!mTupleList.isEmpty()) {
                 mTupleList.forEach(t -> {
-                    usuarioTableDTOS.add(PageUtils.fromTuple(t));
+                    usuarioTableDTOS.add(TupleUtils.buildUsuarioTableFromDTOfromTuple(t));
                 });
             }
         }
@@ -207,8 +213,30 @@ public class UsuarioServiceImpl implements IUsuarioService {
         return this.entityManager.createQuery(mCriteriaQueryLong).getSingleResult();
     }
 
+    private CriteriaQuery buildQuery(CriteriaQuery query, Root root) {
+        return query.multiselect(
+                root.get(UsuarioConstants.idUsuario).alias(UsuarioConstants.ID_USUARIO),
+                root.get(GenericConstans.indActivo).alias(GenericConstans.IND_ACTIVO),
+                root.get(UsuarioConstants.nombre).alias(UsuarioConstants.NOMBRE),
+                root.get(UsuarioConstants.apellidoPaterno).alias(UsuarioConstants.APELLIDO_PATERNO),
+                root.get(UsuarioConstants.apellidoMaterno).alias(UsuarioConstants.APELLIDO_MATERNO),
+                root.get(UsuarioConstants.matricula).alias(UsuarioConstants.MATRICULA),
+                root.get(UsuarioConstants.idEstatus).get(EstatusConstans.nombre).alias(EstatusConstans.ID_ESTATUS),
+                root.get(UsuarioConstants.idPerfil).get(PerfilConstans.nombre).alias(PerfilConstans.ID_PERFIL),
+                root.get(UsuarioConstants.folio).alias(UsuarioConstants.FOLIO),
+                root.get(UsuarioConstants.idDireccion)
+                        .get(DireccionCosntans.IDASENTAMIENTO).get(DireccionCosntans.NOMBRE).alias("ASENTAMIENTO"),
+                root.get(UsuarioConstants.idDireccion)
+                        .get(DireccionCosntans.IDASENTAMIENTO).get(DireccionCosntans.CODIGOPOSTAL).alias("CODIGO_POSTAL"),
+                root.get(UsuarioConstants.idDireccion)
+                        .get(DireccionCosntans.IDASENTAMIENTO).get(DireccionCosntans.IDMUNICIPIO).get(DireccionCosntans.NOMBRE).alias("MUNICIPIO"),
+                root.get(UsuarioConstants.idDireccion)
+                        .get(DireccionCosntans.IDASENTAMIENTO).get(DireccionCosntans.IDMUNICIPIO)
+                        .get(DireccionCosntans.IDESTADO).get(DireccionCosntans.NOMBRE).alias("ESTADO")
+        );
+    }
 
-    private List<Order> buildOrder(CriteriaBuilder pBuilder, Root<UsuarioEntity> pUsaurioEntityRoot, String column, Map<String, Object> order) {
+    private List<Order> buildOrder(CriteriaBuilder pBuilder, Root<UsuarioEntity> pUsaurioEntityRoot, Map<String, Object> order) {
         List<Order> mOrder = new ArrayList<>();
 
         if (order != null && !order.isEmpty()) {
@@ -384,7 +412,7 @@ public class UsuarioServiceImpl implements IUsuarioService {
         String mStringMatricula = "";
         SimpleDateFormat mSimpleDateFormat = new SimpleDateFormat("YYYY/MM/dd");
         if (!pUsuarioEntity.getIdPerfil().getIdPerfil().equals(EPerfiles.ID_ADMIN)) {
-            mStringMatricula += mSimpleDateFormat.format(new Date()).replaceAll("/", "");
+            mStringMatricula += mSimpleDateFormat.format(new Date()).replace("/", "");
             mStringMatricula += pUsuarioEntity.getIdPlantel().getClave();
             //  mStringMatricula += this.consecutivo(pUsuarioEntity.getIdPlantel(), pUsuarioEntity.getIdCarrera());
         }
@@ -405,128 +433,38 @@ public class UsuarioServiceImpl implements IUsuarioService {
         return String.format("%06d", count);
     }
 
-    private String[] getArray(MultipartFile file) throws IOException {
-        List<String> list = new ArrayList<>();
-        InputStream inputStream = file.getInputStream();
-        new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8)).lines()
-                .forEach(line -> {
-                    if (!line.equals("")) {
-                        list.add(line);
-                    }
-                });
-        return list.toArray(new String[0]);
+    @Override
+    public String exportatInformacion(String pFilters, String pOrders, Integer pIdUSuario) throws MsUniversidadException {
+        //todo obtener el query
+        Map<String, Object> mapFilters = pFilters != null ? new Gson().fromJson(pFilters, Map.class) : null;
+        Map<String, Object> mapOrders = pFilters != null ? new Gson().fromJson(pOrders, Map.class) : null;
+        CriteriaBuilder pCriteriaBuilder = this.entityManager.getCriteriaBuilder();
+        CriteriaQuery<Tuple> tupleCriteriaQuery = pCriteriaBuilder.createTupleQuery();
+        Root<UsuarioEntity> root = tupleCriteriaQuery.from(UsuarioEntity.class);
+        var prdicates = this.buildPredicates(mapFilters, root, pCriteriaBuilder);
+        var orders = this.buildOrder(pCriteriaBuilder, root, mapOrders);
+        tupleCriteriaQuery = this.buildQuery(tupleCriteriaQuery, root);
+        tupleCriteriaQuery.orderBy(orders).where(prdicates.toArray(new Predicate[0]));
+        var tupleQueryResult = this.entityManager.createQuery(tupleCriteriaQuery).getResultList();
+        this.preparedData((List<Tuple>) tupleQueryResult, pIdUSuario);
+        return "Se Notificara Cuando el Archivo Este listo para descargar";
     }
 
     @Async
-    public void addMasive(MultipartFile hombres, MultipartFile mujeres, MultipartFile pApellidos, Integer idEstado) throws Exception {
-        GeneradorDeClaves GENERARDOR = new GeneradorDeClaves();
-        var nombresHombre = this.getArray(hombres);
-        var nombresMujer = this.getArray(mujeres);
-        var apellidos = this.getArray(pApellidos);
-        String mStrResult = "";
-        // var e = this.iEstadoService.findById(idEstado);
-        var estados = this.iEstadoService.getAllEstados();
-        var perfil = this.iPerfilService.findById(2);
-        var estatus = this.iEstatusService.findById(1);
-        estados.forEach(e -> {
-            try {
-                Runnable task = () -> {
-                    try {
-                        this.addNewUser(e, perfil, estatus, nombresHombre, nombresMujer, apellidos);
-                    } catch (Exception ex) {
-                        throw new RuntimeException(ex);
-                    }
-                };
-                Thread thread = new Thread(task);
-                thread.start();
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
-            }
+    void preparedData(List<Tuple> tupleQueryResult, Integer pIdUsuario) {
+        List<UsuarioTableDTO> usuarioTableDTOList = new ArrayList<>();
+        JsonArray jsonArray = new JsonArray();
+        tupleQueryResult.forEach(t -> {
+            JsonObject jsonElement = new JsonObject();
+            t.getElements().forEach(element -> {
+                jsonElement.addProperty(element.getAlias(), String.valueOf(t.get(element.getAlias())));
+            });
+            jsonArray.add(jsonElement);
         });
-
-
+        JsonObject finalJsonObject = new JsonObject();
+        finalJsonObject.addProperty("UsuarioDestino", pIdUsuario);
+        finalJsonObject.addProperty("usuarios", new Gson().toJson(jsonArray));
+        this.rabbitTemplate.convertAndSend(this.routingKey, new Gson().toJson(finalJsonObject));
     }
 
-
-    private void addNewUser(EstadoEntity estado, PerfilEntity perfil, EstatusEntity estatus, String[] nombresHombre, String[] nombresMujer, String[] apellidos) throws Exception {
-        log.info("Inciando con el estado: " + estado.getNombre());
-
-        var planteles = this.iPlantelService.findAllByMunicipio(estado);
-        int i = 1;
-        for (var plantel : planteles) {
-            List<UsuarioEntity> usuarioEntities = new ArrayList<>();
-            var asentamientos = this.iAsentamientoService.listAllByMunicipio(plantel.getIdMunicipio());
-            for (var asentamiento : asentamientos) {
-
-                log.info("@MSU-----> " + asentamiento.getNombre());
-
-
-                for (int j = 1; j < 4; j++) {
-                    try {
-
-                        var direccion = DireccionEntity.builder()
-                                .desFachada("n/a")
-                                .numeroExterior("n/a")
-                                .numeroInterior("b/a")
-                                .idAsentamiento(asentamiento)
-                                .calle("normal")
-                                .build();
-                        //  direccion = this.iDireccionService.save(direccion);
-                        var nombre = (j % 2 == 0) ? nombresHombre[UsuarioUtils.getRamndomNumberRange(1, nombresHombre.length)] : nombresMujer[UsuarioUtils.getRamndomNumberRange(1, nombresMujer.length)];
-                        var aPaterno = apellidos[UsuarioUtils.getRamndomNumberRange(1, apellidos.length)];
-                        var genero = (j % 2 == 0) ? 1 : 2;
-                        var desGenero = (genero == 1) ? "MASCULINO" : "FEMENINO";
-                        var aMaterno = apellidos[UsuarioUtils.getRamndomNumberRange(1, apellidos.length)];
-                        var fechaNacimiento = UsuarioUtils.generateRandomDate();
-                        var edad = UsuarioUtils.getEdad(fechaNacimiento);
-                        var random = GeneradorDeClaves.generar(4, 0, 0, 0);
-                        var curp = UsuarioUtils.getCurp(nombre, aPaterno, aMaterno, fechaNacimiento, estado.getNombreAbrebiado(), random, i);
-                        var carrera = this.iCarreraService.findById(UsuarioUtils.getRamndomNumberRange(1, 6));
-                        var password = GeneradorDeClaves.generar(12, 30, 30, 40);
-                        var usuario = UsuarioEntity.builder()
-                                .nombre(nombre)
-                                .apellidoMaterno(aMaterno)
-                                .genero(genero)
-                                .desGenero(desGenero)
-                                .apellidoPaterno(aPaterno)
-                                .correo(curp.concat("@gmail.com"))
-                                .curp(curp)
-                                .fechaNacimiento(fechaNacimiento)
-                                .edad(edad)
-                                .idDireccion(direccion)
-                                .idPerfil(perfil)
-                                .idPlantel(plantel)
-                                .idEstatus(estatus)
-                                .idCarrera(carrera)
-                                .build();
-                        usuario.setMatricula(this.buildMatricula(usuario) + curp);
-                        usuario.setNombreUsuario(usuario.getCurp().concat(usuario.getMatricula()));
-                        usuario.setFechaAlta(new Date());
-                        usuario.setIndActivo(true);
-                        usuario.setPassword(this.passwordEncoder.encode(password));
-                        //  log.info(+j +"asentamiento: " + asentamiento.getNombre() + " " + " Usuario creado: " + " nombreUsuario: " + usuario.getNombreUsuario() + " password: " + password);
-                        usuarioEntities.add(usuario);
-                        //   this.save(usuario);
-                    } catch (Exception e) {
-                        log.info(e.getMessage());
-                    }
-                }
-
-
-                //   this.addAll(usuarioEntities);
-                //    log.info("guardando: " + usuarioEntities.size() + " del estado: " + estado.getNombre());
-            }
-
-            log.info("guardando: " + usuarioEntities.size());
-            this.addAll(usuarioEntities);
-            //  this.addAll(usuarioEntities);
-        }
-
-    }
-
-    @Async
-    public void addAll(List<UsuarioEntity> list) {
-        this.iUsuarioRepository.saveAll(list);
-        log.info("Guardados");
-    }
 }

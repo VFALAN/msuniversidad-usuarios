@@ -2,17 +2,17 @@ package com.vf.dev.msuniversidadusuarios.model.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import javax.persistence.*;
 import java.io.Serializable;
 import java.util.List;
 
-@Table
-@Entity(name = "ESTATUS")
+@Table(name = "ESTATUS")
+@Entity
 @Getter
 @Setter
 @NoArgsConstructor

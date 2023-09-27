@@ -12,7 +12,7 @@ import java.util.List;
 @Repository
 public interface IMunicipioRepository extends JpaRepository<MunicipioEntity, Integer> {
 
-    @Query("SELECT m FROM MunicipioEntity m WHERE m.indActivo = 1 AND m.idEstado = :estado ORDER BY m.nombre ASC")
+    @Query("SELECT m FROM MunicipioEntity m WHERE m.indActivo = true AND m.idEstado = :estado ORDER BY m.nombre ASC")
     List<MunicipioEntity> findllByEstado(@Param("estado") EstadoEntity pEstadoEntity);
 
 }

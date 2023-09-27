@@ -1,9 +1,9 @@
 package com.vf.dev.msuniversidadusuarios.model.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
 import lombok.*;
 
-import javax.persistence.*;
 import java.io.Serializable;
 
 @Entity

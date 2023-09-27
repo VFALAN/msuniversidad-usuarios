@@ -11,6 +11,5 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface IUsuarioService extends IGenericService<UsuarioEntity, UsuarioDTO, UsuarioTableDTO, IUsuarioDetalle> {
     DisponivilidadResponseDTO validarUsernameAndCorreo(String pUsername, String pCorreo);
-
-    void addMasive(MultipartFile hombres,MultipartFile mujeres, MultipartFile apellidos, Integer idEstado) throws Exception;
+     String exportatInformacion(String pFilters, String pOrders, Integer pIdUSuario) throws MsUniversidadException;
 }

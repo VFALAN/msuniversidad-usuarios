@@ -1,8 +1,8 @@
 package com.vf.dev.msuniversidadusuarios.utils;
 
 import com.google.gson.JsonObject;
+import jakarta.servlet.http.HttpServletRequest;
 
-import javax.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;

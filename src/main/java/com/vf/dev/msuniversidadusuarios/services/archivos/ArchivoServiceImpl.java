@@ -19,8 +19,6 @@ public class ArchivoServiceImpl implements IArchivosService {
     @Autowired
     private IMsMinioService iMsMinioService;
 
-    @Autowired
-    private EurekaClient eurekaClient;
 
     @Override
     public void guardarArchivo(MultipartFile pFile, Integer tipoArchivo, Integer pBucket, UsuarioEntity pUsuario) throws MsUniversidadException {
@@ -34,8 +32,8 @@ public class ArchivoServiceImpl implements IArchivosService {
 
     @Override
     public void updateFile(MultipartFile pFile, Integer idArchivo) throws MsUniversidadException {
-        var response  =this.iMsMinioService.updateFile(idArchivo,pFile);
-        if(response.getStatusCode() !=HttpStatus.OK){
+        var response = this.iMsMinioService.updateFile(idArchivo, pFile);
+        if (response.getStatusCode() != HttpStatus.OK) {
             throw new MsUniversidadException("Error en el Servidor:    " + response.getBody());
         }
     }

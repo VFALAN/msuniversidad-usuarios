@@ -1,8 +1,8 @@
 package com.vf.dev.msuniversidadusuarios.model.entity;
 
+import jakarta.persistence.*;
 import lombok.*;
 
-import javax.persistence.*;
 import java.util.List;
 
 @Getter

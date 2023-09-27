@@ -1,11 +1,11 @@
 package com.vf.dev.msuniversidadusuarios.model.dto.usuario;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.util.Date;
 
@@ -15,7 +15,7 @@ import java.util.Date;
 @AllArgsConstructor
 @Builder
 @Data
-public class UsuarioDTO {
+public class UsuarioDTO implements Serializable{
     @JsonProperty
     private Integer idUsuario;
     @JsonProperty

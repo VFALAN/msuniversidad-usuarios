@@ -13,6 +13,6 @@ import java.util.List;
 public interface IAsentamientoRepository extends JpaRepository<AsentamientoEntity, Integer> {
 
 
-    @Query("SELECT a FROM AsentamientoEntity a WHERE a.indActivo = 1 AND a.idMunicipio = :municipio ORDER BY a.nombre ASC ")
+    @Query("SELECT a FROM AsentamientoEntity a WHERE a.indActivo = true AND a.idMunicipio = :municipio ORDER BY a.nombre ASC ")
     List<AsentamientoEntity> findAllByMunicipio(@Param("municipio") MunicipioEntity pMunicipio);
 }
